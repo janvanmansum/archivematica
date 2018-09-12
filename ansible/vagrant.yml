@@ -1,0 +1,190 @@
+- hosts: test
+  become: yes
+  tasks:
+
+  - name: Enable SELinux
+    selinux:
+      policy: targeted
+      state: enforcing
+
+  - name: Install requirements and utility software
+    yum:
+      name: "{{ item }}"
+    with_items:
+      - libselinux-python
+      - libsemanage-python
+      - setroubleshoot-server
+      - setroubleshoot
+      - setroubleshoot-plugins
+      - MySQL-python
+      - epel-release
+      - tree
+      - mlocate
+
+  - name: Configure SELinux ports
+    seport:
+      ports: "{{ item }}"
+      proto: tcp
+      setype: http_port_t
+      state: present
+    with_items:
+      - 81
+      - 8001
+
+  - name: Allow Nginx to connect the MySQL server and Gunicorn backends and to change system limits
+    seboolean:
+      name: "{{ item }}"
+      state: yes
+      persistent: yes
+    with_items:
+      - httpd_can_network_connect_db
+      - httpd_can_network_connect
+      - httpd_setrlimit
+
+  - name: Import Elastic search key
+    command: "rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch"
+
+  - name: Add RPM repos
+    copy:
+      src: "{{ item }}.repo"
+      dest: "/etc/yum.repos.d/"
+    with_items:
+      - archivematica
+      - archivematica-extras
+      - elasticsearch
+
+  - name: Install supporting software
+    yum:
+      name: "{{ item }}"
+    with_items:
+      - java-1.8.0-openjdk-headless
+      - mariadb-server
+      - gearmand
+      - elasticsearch
+
+  - name: Start and enable services
+    service:
+      name: "{{ item }}"
+      state: started
+      enabled: yes
+    with_items:
+      - elasticsearch
+      - mariadb
+      - gearmand
+
+  - name: Install Archivematica storage service
+    yum:
+      name: "{{ item }}"
+    with_items:
+      - python-pip
+      - archivematica-storage-service
+
+  - name: Upload helper scripts
+    copy:
+      src: "{{ item }}"
+      dest: "/tmp"
+      owner: archivematica
+      mode: "700"
+    with_items:
+      - migrate-ss.sh
+      - migrate-dashboard.sh
+
+  - name: Populate the SQLite database, and collect some static files used by django
+    command: "sudo -u archivematica /tmp/migrate-ss.sh"
+
+  - name: Start and enable storage service
+    service:
+      name: "{{ item }}"
+      state: started
+      enabled: yes
+    with_items:
+      - archivematica-storage-service
+      - nginx
+      - rngd
+
+  - name: Install MCP and dashboard
+    yum:
+      name: "{{ item }}"
+    with_items:
+      - archivematica-common
+      - archivematica-mcp-server
+      - archivematica-dashboard
+
+  - name: Create MCP database
+    mysql_db:
+      name: MCP
+      state: present
+      encoding: utf8
+      collation: utf8_unicode_ci
+      login_user: root
+
+  - mysql_user:
+      name: archivematica
+      password: demo
+      state: present
+      priv: '*.*:ALL,GRANT'
+
+  - name: Run migrations
+    command: "sudo -u archivematica /tmp/migrate-dashboard.sh"
+
+  - name: Start and enable MCP
+    service:
+      name: "{{ item }}"
+      state: started
+      enabled: yes
+    with_items:
+      - archivematica-mcp-server
+      - archivematica-dashboard
+
+  - name: Restart nginx
+    service:
+      name: nginx
+      state: restarted
+
+  #
+  # MCP client
+  #
+  - name: Install yum repos with MCP client dependencies
+    yum:
+      name: "{{ item }}"
+    with_items:
+      - https://li.nux.ro/download/nux/dextop/el7/x86_64/nux-dextop-release-0-5.el7.nux.noarch.rpm
+      - https://forensics.cert.org/cert-forensics-tools-release-el7.rpm
+
+  - name: Install MCP client
+    yum:
+      name: archivematica-mcp-client
+
+  - name: Create symlink for 7z
+    file:
+      src: /usr/bin/7za
+      dest: /usr/bin/7z
+      state: link
+
+  - name: Edit Clamav config
+    replace:
+      path: /etc/clamd.d/scan.conf
+      regexp: "{{ item.regexp }}"
+      replace: "{{ item.replace }}"
+    with_items:
+      - { regexp: '^#TCPSocket', replace: 'TCPSocket' }
+      - { regexp: '^Example', replace: '' }
+
+  - name: Start/enable services
+    service:
+      name: "{{ item }}"
+      state: started
+      enabled: yes
+    with_items:
+      - archivematica-mcp-client
+      - fits-nailgun
+      - clamd@scan
+
+  - name: Restart services
+    service:
+      name: "{{ item }}"
+      state: restarted
+    with_items:
+      - archivematica-dashboard
+      - archivematica-mcp-server
+
