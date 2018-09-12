@@ -1,5 +1,9 @@
 - hosts: test
   become: yes
+  vars:
+    storage_service_admin_name: "admin"
+    storage_service_admin_email: "not@provided.nl"
+    storage_service_admin_password: "admin"
   tasks:
 
   - name: Enable SELinux
@@ -88,6 +92,7 @@
     with_items:
       - migrate-ss.sh
       - migrate-dashboard.sh
+      - create-superuser.sh
 
   - name: Populate the SQLite database, and collect some static files used by django
     command: "sudo -u archivematica /tmp/migrate-ss.sh"
@@ -187,4 +192,8 @@
     with_items:
       - archivematica-dashboard
       - archivematica-mcp-server
+
+  # TODO: make idempotent
+  - name: Create superuser
+    command: "sudo -u archivematica /tmp/create-superuser.sh '{{ storage_service_admin_name }}' '{{ storage_service_admin_email }}' '{{ storage_service_admin_password }}'"
 
