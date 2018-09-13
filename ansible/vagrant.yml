@@ -193,7 +193,22 @@
       - archivematica-dashboard
       - archivematica-mcp-server
 
-  # TODO: make idempotent
   - name: Create superuser
     command: "sudo -u archivematica /tmp/create-superuser.sh '{{ storage_service_admin_name }}' '{{ storage_service_admin_email }}' '{{ storage_service_admin_password }}'"
+
+  - name: Create an archivist user
+    user:
+      name: archie01
+
+  - name: Create a transfers directory for the archivist
+    file:
+      path: /home/archie01/tranfers
+      state: directory
+      group: archivematica
+      mode: 0774
+
+  - name: Make home directory of archivist browsable by archivematica
+    file:
+      path: /home/archie01
+      mode: "o+rx"
 
