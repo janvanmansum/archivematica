@@ -24,6 +24,7 @@
       - epel-release
       - tree
       - mlocate
+      - tmux
 
   - name: Configure SELinux ports
     seport:
