@@ -12,7 +12,7 @@ Vagrant.configure(2) do |config|
       end
       test.vm.provider "virtualbox" do |vb|
         vb.gui = false
-        vb.memory = 2072
+        vb.memory = 4096
         vb.cpus = 2
         vb.customize ["guestproperty", "set", :id, "--timesync-threshold", "1000"]
         vb.customize ["guestproperty", "set", :id, "--timesync-interval", "1000"]

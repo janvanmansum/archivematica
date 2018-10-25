@@ -6,6 +6,10 @@
     storage_service_admin_password: "admin"
   tasks:
 
+  - name: Install the EPEL repo
+    yum:
+      name: epel-release
+
   - name: Enable SELinux
     selinux:
       policy: targeted
