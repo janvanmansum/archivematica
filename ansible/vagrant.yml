@@ -153,8 +153,7 @@
   #
   - name: Install yum repos with MCP client dependencies
     yum:
-      name: "{{ item }}"
-    with_items:
+      name:
       - https://li.nux.ro/download/nux/dextop/el7/x86_64/nux-dextop-release-0-5.el7.nux.noarch.rpm
       - https://forensics.cert.org/cert-forensics-tools-release-el7.rpm
 
